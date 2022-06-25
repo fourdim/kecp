@@ -1,11 +1,13 @@
 package kecpfakews
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"sync"
 	"time"
 
+	kecpmsg "github.com/fourdim/kecp/modules/kecp-msg"
 	"github.com/gorilla/websocket"
 )
 
@@ -15,12 +17,14 @@ type Conn struct {
 	open     bool
 	mx       sync.RWMutex
 	reliable bool
+	name     string
 }
 
-func NewConn(reliable bool) *Conn {
+func NewConn(reliable bool, name string) *Conn {
 	conn := &Conn{
 		open:     true,
 		reliable: reliable,
+		name:     name,
 	}
 	return conn
 }
@@ -85,7 +89,12 @@ func (conn *Conn) ReadMessage() (messageType int, p []byte, err error) {
 				Text: "CloseAbnormalClosure",
 			}
 		} else {
-			return TextMessage, []byte("Hello"), nil
+			d, _ := json.Marshal(kecpmsg.Message{
+				Type:    kecpmsg.Chat,
+				Name:    conn.name,
+				Payload: "hello",
+			})
+			return TextMessage, d, nil
 		}
 	}
 }

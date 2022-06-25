@@ -6,11 +6,11 @@ from pathlib import Path
 
 MOD = Path('github.com/fourdim/kecp')
 
-def basic_test(build_target :str):
-    execvp('go', ('go', 'test', '-timeout', '30s', '-cover', build_target))
+def basic_test(build_target :str, time_out :str):
+    execvp('go', ('go', 'test', '-timeout', time_out, '-cover', build_target))
 
-def race_test(build_target :str):
-    execvp('go', ('go', 'test', '-timeout', '60s', '-cpu=1,9,55,99', '-race', '-count=100', '-failfast', '-cover', build_target))
+def race_test(build_target :str, time_out :str):
+    execvp('go', ('go', 'test', '-timeout', time_out, '-cpu=1,9,55,99', '-race', '-count=100', '-failfast', '-cover', build_target))
 
 test_cases = [
     {
@@ -26,7 +26,7 @@ test_cases = [
     {
         'target': 'modules/kecp-signal',
         'test_method': basic_test,
-        'time_out': '30s'
+        'time_out': '180s'
     }
 ]
 
@@ -34,7 +34,7 @@ def test():
     ps = []
     for test_case in test_cases:
         path = Path.joinpath(MOD, test_case['target'])
-        p = multiprocessing.Process(target=test_case['test_method'], args=(path.as_posix(),))
+        p = multiprocessing.Process(target=test_case['test_method'], args=(path.as_posix(), test_case['time_out']))
         p.start()
         ps.append(p)
     for p in ps:

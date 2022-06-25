@@ -1,6 +1,6 @@
 package kecpchannel
 
-// https://gist.github.com/leolara/f6fb5dfc04d64947487f16764d6b37b6
+// https://github.com/leolara/conveyor
 
 import (
 	"sync"

@@ -5,6 +5,7 @@ import (
 
 	kchan "github.com/fourdim/kecp/modules/kecp-channel"
 	kecpcrypto "github.com/fourdim/kecp/modules/kecp-crypto"
+	kecpmsg "github.com/fourdim/kecp/modules/kecp-msg"
 )
 
 const (
@@ -24,7 +25,10 @@ type Room struct {
 	clients map[string]*Client
 
 	// Inbound messages from the clients.
-	broadcast *kchan.Channel[[]byte]
+	broadcast *kchan.Channel[*kecpmsg.Message]
+
+	// Inbound messages from the clients.
+	forward *kchan.Channel[*kecpmsg.Message]
 
 	// Register requests from the clients.
 	register *kchan.Channel[*Client]
@@ -45,7 +49,8 @@ func (reg *Registry) NewRoom(managementKey string) (string, error) {
 		RoomID:          roomID,
 		ManagementKey:   managementKey,
 		registry:        reg,
-		broadcast:       kchan.New[[]byte](),
+		broadcast:       kchan.New[*kecpmsg.Message](),
+		forward:         kchan.New[*kecpmsg.Message](),
 		register:        kchan.New[*Client](),
 		unregister:      kchan.New[*Client](),
 		clients:         make(map[string]*Client),
@@ -53,12 +58,8 @@ func (reg *Registry) NewRoom(managementKey string) (string, error) {
 		selfDestruction: make(chan bool),
 	}
 	room.registry.register.Write(room)
-	checker := time.NewTimer(clientJoinedCheckWait)
-	defer checker.Stop()
 	select {
 	case <-room.created:
-	case <-checker.C:
-		return "", ErrCanNotCreateTheRoom
 	}
 	go room.run()
 	return roomID, nil
@@ -75,34 +76,49 @@ func (room *Room) run() {
 	for {
 		select {
 		case client := <-room.register.Read():
-			if previousClient, ok := room.clients[client.ClientKey]; ok {
+			var joined = true
+			for _, eachClient := range room.clients {
+				// Same name, but not the same client.
+				if client.name == eachClient.name && client.clientKey != eachClient.clientKey {
+					joined = false
+					break
+				}
+			}
+			if !joined {
+				client.joined <- false
+				break
+			}
+			if previousClient, ok := room.clients[client.clientKey]; ok {
 				previousClient.selfDestruction <- true
 			}
-			room.clients[client.ClientKey] = client
+			room.clients[client.clientKey] = client
 			client.joined <- true
-		case clientUnregistered := <-room.unregister.Read():
-			if client, ok := room.clients[clientUnregistered.ClientKey]; ok {
-				if client == clientUnregistered {
-					delete(room.clients, clientUnregistered.ClientKey)
-				}
-				close(clientUnregistered.send)
-				close(clientUnregistered.joined)
-				close(clientUnregistered.selfDestruction)
+			var names []string
+			for _, eachClient := range room.clients {
+				names = append(names, eachClient.name)
 			}
+			client.send <- kecpmsg.NewListMessage(names)
+			broadcast(room, kecpmsg.NewJoinMessage(client.name, client.clientKey))
+		case clientUnregistered := <-room.unregister.Read():
+			if client, ok := room.clients[clientUnregistered.clientKey]; ok {
+				if client == clientUnregistered {
+					delete(room.clients, clientUnregistered.clientKey)
+				}
+			}
+			close(clientUnregistered.send)
+			close(clientUnregistered.joined)
+			close(clientUnregistered.selfDestruction)
+			broadcast(room, kecpmsg.NewLeaveMessage(clientUnregistered.name))
+			if len(room.clients) == 0 {
+				return
+			}
+		case message := <-room.forward.Read():
+			forward(room, message)
 			if len(room.clients) == 0 {
 				return
 			}
 		case message := <-room.broadcast.Read():
-			for clientKey, client := range room.clients {
-				select {
-				case client.send <- message:
-				default:
-					delete(room.clients, clientKey)
-					close(client.send)
-					close(client.joined)
-					close(client.selfDestruction)
-				}
-			}
+			broadcast(room, message)
 			if len(room.clients) == 0 {
 				return
 			}
@@ -116,5 +132,34 @@ func (room *Room) run() {
 				client.selfDestruction <- true
 			}
 		}
+	}
+}
+
+func broadcast(room *Room, message *kecpmsg.Message) {
+	for clientKey, client := range room.clients {
+		if message.ExceptClientKey == clientKey {
+			continue
+		}
+		sendToSingleClient(room, client, message)
+	}
+}
+
+func forward(room *Room, message *kecpmsg.Message) {
+	for _, client := range room.clients {
+		if message.Target == client.name {
+			sendToSingleClient(room, client, message)
+			break
+		}
+	}
+}
+
+func sendToSingleClient(room *Room, client *Client, message *kecpmsg.Message) {
+	select {
+	case client.send <- message:
+	default:
+		delete(room.clients, client.clientKey)
+		close(client.send)
+		close(client.joined)
+		close(client.selfDestruction)
 	}
 }

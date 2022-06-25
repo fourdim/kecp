@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	. "github.com/fourdim/kecp/modules/kecp-signal"
 	"github.com/gorilla/websocket"
@@ -12,6 +13,7 @@ import (
 
 func TestGorillaWebsocketCompatibility(t *testing.T) {
 	reg := NewRegistry()
+	roomID, _ := reg.NewRoom("aaa")
 
 	http.HandleFunc("/", echo)
 	l, err := net.Listen("tcp", "127.0.0.1:19216")
@@ -19,7 +21,13 @@ func TestGorillaWebsocketCompatibility(t *testing.T) {
 
 	go http.Serve(l, http.DefaultServeMux)
 
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	}
+
 	con, _, err := websocket.DefaultDialer.Dial("ws://127.0.0.1:19216/", nil)
 	assert.NoError(t, err, "error on dialing")
-	reg.NewClient("aaa", "aaa", con)
+	assert.NoError(t, reg.NewClient("〔=ヘ=#〕", "aaa", roomID, con))
 }

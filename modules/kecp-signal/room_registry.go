@@ -44,6 +44,7 @@ func (reg *Registry) run() {
 				room.broadcast.Close()
 				room.register.Close()
 				room.unregister.Close()
+				close(room.created)
 				close(room.selfDestruction)
 			}
 		case roomQuery := <-reg.roomQuery.Read():

@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"math/rand"
 	"testing"
+	"time"
 
 	kecpfakews "github.com/fourdim/kecp/modules/kecp-fakews"
 	. "github.com/fourdim/kecp/modules/kecp-signal"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNoUserJoined(t *testing.T) {
@@ -26,8 +28,13 @@ func TestNoUserJoined(t *testing.T) {
 	for range roomIDs {
 		rand.Read(b)
 		userKey := base64.RawURLEncoding.EncodeToString(b)
-		rand.Read(b)
-		roomID := base64.RawURLEncoding.EncodeToString(b)
-		reg.NewClient(userKey, roomID, kecpfakews.NewConn(false))
+		err := reg.NewClient("〔=ヘ=#〕", userKey, userKey, kecpfakews.NewConn(false, "〔=ヘ=#〕"))
+		assert.EqualError(t, err, ErrCanNotJoinTheRoom.Error())
+	}
+
+	timer1 := time.NewTimer(31 * time.Second)
+	defer timer1.Stop()
+	select {
+	case <-timer1.C:
 	}
 }

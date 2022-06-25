@@ -57,7 +57,8 @@ func TestWithUsersJoined(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			rand.Read(b)
 			userKey := base64.RawURLEncoding.EncodeToString(b)
-			reg.NewClient(userKey, roomID, kecpfakews.NewConn(false))
+			userName := userKey[:12]
+			reg.NewClient(userName, userKey, roomID, kecpfakews.NewConn(false, userName))
 		}
 	}
 
@@ -97,8 +98,70 @@ func TestSameUsers(t *testing.T) {
 	for _, roomID := range roomIDs {
 		rand.Read(b)
 		userKey := base64.RawURLEncoding.EncodeToString(b)
+		userName := userKey[:12]
 		for i := 0; i < 10; i++ {
-			reg.NewClient(userKey, roomID, kecpfakews.NewConn(false))
+			reg.NewClient(userName, userKey, roomID, kecpfakews.NewConn(false, userName))
+		}
+	}
+
+	timer1 := time.NewTimer(kecpfakews.MathRandLongTimeGen())
+	defer timer1.Stop()
+	select {
+	case <-timer1.C:
+	}
+
+	for _, roomID := range roomIDs {
+		if kecpfakews.MathRandGen() < 2 {
+			reg.DeleteRoom(roomID)
+		}
+	}
+
+	timer2 := time.NewTimer(3 * time.Second)
+	defer timer2.Stop()
+	select {
+	case <-timer2.C:
+	}
+}
+
+func TestInvalidName(t *testing.T) {
+	reg := NewRegistry()
+
+	b := make([]byte, 48)
+
+	rand.Read(b)
+	userKey := base64.RawURLEncoding.EncodeToString(b)
+	roomID, _ := reg.NewRoom(userKey)
+
+	for i := 0; i < 3; i++ {
+		rand.Read(b)
+		userKey := base64.RawURLEncoding.EncodeToString(b)
+		err := reg.NewClient(userKey, userKey, roomID, kecpfakews.NewConn(true, userKey))
+		assert.EqualError(t, err, ErrNotAValidName.Error())
+	}
+}
+
+func TestSameNames(t *testing.T) {
+	reg := NewRegistry()
+
+	var roomIDs []string
+	b := make([]byte, 48)
+	for i := 0; i < 10; i++ {
+		rand.Read(b)
+		userKey := base64.RawURLEncoding.EncodeToString(b)
+		roomID, _ := reg.NewRoom(userKey)
+		if roomID != "" {
+			roomIDs = append(roomIDs, roomID)
+		}
+	}
+
+	for _, roomID := range roomIDs {
+		for i := 0; i < 10; i++ {
+			rand.Read(b)
+			userKey := base64.RawURLEncoding.EncodeToString(b)
+			err := reg.NewClient("〔=ヘ=#〕", userKey, roomID, kecpfakews.NewConn(true, "〔=ヘ=#〕"))
+			if i != 0 {
+				assert.EqualError(t, err, ErrNameIsAlreadyInUse.Error())
+			}
 		}
 	}
 
@@ -126,7 +189,7 @@ func TestWithUsersJoinedAndRoomDeletedSimultaneously(t *testing.T) {
 
 	var roomIDs []string
 	b := make([]byte, 48)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 3; i++ {
 		rand.Read(b)
 		userKey := base64.RawURLEncoding.EncodeToString(b)
 		roomID, _ := reg.NewRoom(userKey)
@@ -136,25 +199,16 @@ func TestWithUsersJoinedAndRoomDeletedSimultaneously(t *testing.T) {
 	}
 
 	for _, roomID := range roomIDs {
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 5; i++ {
 			rand.Read(b)
 			userKey := base64.RawURLEncoding.EncodeToString(b)
-			reg.NewClient(userKey, roomID, kecpfakews.NewConn(false))
+			userName := userKey[:12]
+			reg.NewClient(userName, userKey, roomID, kecpfakews.NewConn(false, userName))
+			if i == 2 {
+				reg.DeleteRoom(roomID)
+			}
 		}
 	}
-
-	for _, roomID := range roomIDs {
-		if kecpfakews.MathRandGen() < 2 {
-			reg.DeleteRoom(roomID)
-		}
-	}
-
-	timer := time.NewTimer(3 * time.Second)
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-	}
-
 }
 
 func TestGoroutineLeak(t *testing.T) {
@@ -177,7 +231,8 @@ func TestGoroutineLeak(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			rand.Read(b)
 			userKey := base64.RawURLEncoding.EncodeToString(b)
-			reg.NewClient(userKey, roomID, kecpfakews.NewConn(true))
+			userName := userKey[:12]
+			reg.NewClient(userName, userKey, roomID, kecpfakews.NewConn(true, userName))
 		}
 	}
 
@@ -199,5 +254,36 @@ func TestGoroutineLeak(t *testing.T) {
 	case <-timer2.C:
 	}
 
-	assert.LessOrEqual(t, runtime.NumGoroutine(), baseGoroutineNum)
+	// Add a breakpoint here to see whether goroutine leaks.
+	assert.LessOrEqual(t, runtime.NumGoroutine(), baseGoroutineNum+6)
+}
+
+func TestClientPing(t *testing.T) {
+	reg := NewRegistry()
+
+	var roomIDs []string
+	b := make([]byte, 48)
+	for i := 0; i < 5; i++ {
+		rand.Read(b)
+		userKey := base64.RawURLEncoding.EncodeToString(b)
+		roomID, _ := reg.NewRoom(userKey)
+		if roomID != "" {
+			roomIDs = append(roomIDs, roomID)
+		}
+	}
+
+	for _, roomID := range roomIDs {
+		for i := 0; i < 3; i++ {
+			rand.Read(b)
+			userKey := base64.RawURLEncoding.EncodeToString(b)
+			userName := userKey[:12]
+			reg.NewClient(userName, userKey, roomID, kecpfakews.NewConn(true, userName))
+		}
+	}
+
+	timer1 := time.NewTimer(61 * time.Second)
+	defer timer1.Stop()
+	select {
+	case <-timer1.C:
+	}
 }

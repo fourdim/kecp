@@ -1,6 +1,6 @@
 package kecpchannel_test
 
-// https://gist.github.com/leolara/f6fb5dfc04d64947487f16764d6b37b6
+// https://github.com/leolara/conveyor
 // In order to detect race conditions run the test with:
 // go test -cpu=1,9,55,99 -race -count=100 -failfast
 
