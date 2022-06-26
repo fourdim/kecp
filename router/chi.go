@@ -1,18 +1,21 @@
 package router
 
 import (
+	kecpsignal "github.com/fourdim/kecp/modules/kecp-signal"
+	"github.com/fourdim/kecp/services"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/render"
 )
 
-func SetupChiRouter() *chi.Mux {
+func SetupKecpChiRouter() *chi.Mux {
 	kecpRouter := chi.NewRouter()
 
-	kecpRouter.Route("/reg", func(r chi.Router) {
+	reg := kecpsignal.NewRegistry()
 
-	})
-
-	kecpRouter.Route("/ws", func(r chi.Router) {
-
+	kecpRouter.Route("/rooms", func(r chi.Router) {
+		r.Use(render.SetContentType(render.ContentTypeJSON))
+		r.Post("/", services.NewRoomHandler(reg))
+		r.Get("/{roomID}", services.NewClientHandler(reg))
 	})
 
 	return kecpRouter

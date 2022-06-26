@@ -1,4 +1,4 @@
-package kecpws
+package kecpsignal
 
 import (
 	stdlog "log"

@@ -1,4 +1,4 @@
-package kecpws_test
+package kecpsignal_test
 
 import (
 	"net"
@@ -13,7 +13,7 @@ import (
 
 func TestGorillaWebsocketCompatibility(t *testing.T) {
 	reg := NewRegistry()
-	roomID, _ := reg.NewRoom("aaa")
+	roomID := reg.NewRoom("aaa")
 
 	http.HandleFunc("/", echo)
 	l, err := net.Listen("tcp", "127.0.0.1:19216")
@@ -29,5 +29,5 @@ func TestGorillaWebsocketCompatibility(t *testing.T) {
 
 	con, _, err := websocket.DefaultDialer.Dial("ws://127.0.0.1:19216/", nil)
 	assert.NoError(t, err, "error on dialing")
-	assert.NoError(t, reg.NewClient("〔=ヘ=#〕", "aaa", roomID, con))
+	assert.NoError(t, reg.GetRoom(roomID).NewClient("〔=ヘ=#〕", "aaa", con))
 }

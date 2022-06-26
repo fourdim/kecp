@@ -1,4 +1,4 @@
-package kecpws
+package kecpsignal
 
 import (
 	"time"
@@ -43,7 +43,7 @@ type Room struct {
 	selfDestruction chan bool
 }
 
-func (reg *Registry) NewRoom(managementKey string) (string, error) {
+func (reg *Registry) NewRoom(managementKey string) string {
 	roomID := kecpcrypto.GenerateToken()
 	room := &Room{
 		RoomID:          roomID,
@@ -62,7 +62,7 @@ func (reg *Registry) NewRoom(managementKey string) (string, error) {
 	case <-room.created:
 	}
 	go room.run()
-	return roomID, nil
+	return roomID
 }
 
 func (room *Room) run() {

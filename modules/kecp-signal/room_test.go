@@ -1,4 +1,4 @@
-package kecpws_test
+package kecpsignal_test
 
 import (
 	"encoding/base64"
@@ -19,7 +19,7 @@ func TestNoUserJoined(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		rand.Read(b)
 		userKey := base64.RawURLEncoding.EncodeToString(b)
-		roomID, _ := reg.NewRoom(userKey)
+		roomID := reg.NewRoom(userKey)
 		if roomID != "" {
 			roomIDs = append(roomIDs, roomID)
 		}
@@ -28,7 +28,7 @@ func TestNoUserJoined(t *testing.T) {
 	for range roomIDs {
 		rand.Read(b)
 		userKey := base64.RawURLEncoding.EncodeToString(b)
-		err := reg.NewClient("〔=ヘ=#〕", userKey, userKey, kecpfakews.NewConn(false, "〔=ヘ=#〕"))
+		err := reg.GetRoom(userKey).NewClient("〔=ヘ=#〕", userKey, kecpfakews.NewConn(false, "〔=ヘ=#〕"))
 		assert.EqualError(t, err, ErrCanNotJoinTheRoom.Error())
 	}
 

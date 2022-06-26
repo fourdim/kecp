@@ -1,4 +1,4 @@
-package kecpws
+package kecpsignal
 
 import (
 	"bytes"
@@ -70,12 +70,11 @@ type WebscoketConn interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
-func (reg *Registry) NewClient(name string, key string, roomID string, conn WebscoketConn) error {
-	if !kecpvalidate.IsValidUserName(name) {
+func (room *Room) NewClient(name string, key string, conn WebscoketConn) error {
+	if !kecpvalidate.IsAValidUserName(name) {
 		conn.Close()
 		return ErrNotAValidName
 	}
-	room := reg.getRoom(roomID)
 	if room == nil {
 		conn.Close()
 		return ErrCanNotJoinTheRoom
@@ -89,7 +88,7 @@ func (reg *Registry) NewClient(name string, key string, roomID string, conn Webs
 		joined:          make(chan bool),
 		selfDestruction: make(chan bool),
 	}
-	client.room.register.Write(client)
+	room.register.Write(client)
 	checker := time.NewTimer(clientJoinedCheckWait)
 	defer checker.Stop()
 	select {

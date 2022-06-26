@@ -2,7 +2,7 @@ package kecpvalidate
 
 import "unicode"
 
-func IsValidUserName(s string) bool {
+func IsAValidUserName(s string) bool {
 	if len(s) > 16 {
 		return false
 	}

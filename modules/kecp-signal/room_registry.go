@@ -1,4 +1,4 @@
-package kecpws
+package kecpsignal
 
 import kchan "github.com/fourdim/kecp/modules/kecp-channel"
 
@@ -67,7 +67,7 @@ type roomQuery struct {
 	room   chan *Room
 }
 
-func (reg *Registry) getRoom(roomID string) *Room {
+func (reg *Registry) GetRoom(roomID string) *Room {
 	roomQuery := &roomQuery{
 		roomID: roomID,
 		room:   make(chan *Room),

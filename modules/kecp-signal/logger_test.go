@@ -1,4 +1,4 @@
-package kecpws_test
+package kecpsignal_test
 
 import (
 	"log"
