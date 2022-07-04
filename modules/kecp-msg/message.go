@@ -3,6 +3,7 @@ package kecpmsg
 import (
 	"encoding/json"
 	"errors"
+	"log"
 )
 
 type MsgType string
@@ -18,10 +19,16 @@ type Message struct {
 	Target string `json:"target,omitempty"`
 
 	// The message's payload.
-	Payload string `json:"payload"`
+	Payload interface{} `json:"payload"`
 
 	// Broadcast except the client with clientKey.
 	ExceptClientKey string `json:"-"`
+}
+
+type AuthMessage struct {
+	RoomID    string `json:"room_id"`
+	Name      string `json:"name"`
+	ClientKey string `json:"client_key"`
 }
 
 const (
@@ -32,6 +39,7 @@ const (
 	List            MsgType = "list"
 	Join            MsgType = "join"
 	Leave           MsgType = "leave"
+	Error           MsgType = "error"
 )
 
 var (
@@ -39,15 +47,23 @@ var (
 )
 
 func Parse(msg []byte, name string) (*Message, error) {
-	var KecpMsg Message
-	err := json.Unmarshal(msg, &KecpMsg)
+	var kecpMsg Message
+	err := json.Unmarshal(msg, &kecpMsg)
 	if err != nil {
 		return nil, err
 	}
-	if KecpMsg.Name != name {
+	if kecpMsg.Name != name {
 		return nil, ErrCanNotParseMessage
 	}
-	return &KecpMsg, nil
+	switch kecpMsg.Type {
+	case List:
+		fallthrough
+	case Join:
+		fallthrough
+	case Leave:
+		return nil, ErrCanNotParseMessage
+	}
+	return &kecpMsg, nil
 }
 
 func (kecpMsg *Message) NeedBroadcast() bool {
@@ -59,6 +75,10 @@ func (kecpMsg *Message) NeedBroadcast() bool {
 	case NewIceCandidate:
 		fallthrough
 	case List:
+		fallthrough
+	case Join:
+		fallthrough
+	case Leave:
 		return false
 	case Chat:
 		if kecpMsg.Target != "" {
@@ -72,5 +92,6 @@ func (kecpMsg *Message) NeedBroadcast() bool {
 
 func (kecpMsg *Message) Build() []byte {
 	b, _ := json.Marshal(kecpMsg)
+	log.Println(string(b))
 	return b
 }

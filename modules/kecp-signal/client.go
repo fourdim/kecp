@@ -2,15 +2,20 @@ package kecpsignal
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"io"
 	"time"
 
 	kecpmsg "github.com/fourdim/kecp/modules/kecp-msg"
 	kecpvalidate "github.com/fourdim/kecp/modules/kecp-validate"
-	"github.com/gorilla/websocket"
+	ws "github.com/gorilla/websocket"
 )
 
 const (
+	// Time allowed to read the auth message.
+	authWait = 5 * time.Second
+
 	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
 
@@ -21,7 +26,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 512
+	maxMessageSize = 10240
 
 	// Time allowed to get an ack from a room.
 	clientJoinedCheckWait = 2 * time.Second
@@ -70,18 +75,39 @@ type WebscoketConn interface {
 	WriteMessage(messageType int, data []byte) error
 }
 
-func (room *Room) NewClient(name string, key string, conn WebscoketConn) error {
-	if !kecpvalidate.IsAValidUserName(name) {
-		conn.Close()
+func (reg *Registry) NewClient(conn WebscoketConn) (retErr error) {
+	defer func() {
+		if retErr != nil && !errors.Is(retErr, ErrConnectionLost) {
+			sendErrorMsg(conn, retErr)
+		}
+		if retErr != nil {
+			conn.Close()
+		}
+	}()
+	conn.SetReadLimit(maxMessageSize)
+	conn.SetReadDeadline(time.Now().Add(authWait))
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		return ErrConnectionLost
+	}
+	var auth kecpmsg.AuthMessage
+	conn.SetWriteDeadline(time.Now().Add(writeWait))
+	if err := json.Unmarshal(msg, &auth); err != nil {
+		return ErrCanNotJoinTheRoom
+	}
+	if !kecpvalidate.IsAValidCryptoKey(auth.ClientKey) {
+		return ErrNotAValidKey
+	}
+	if !kecpvalidate.IsAValidUserName(auth.Name) {
 		return ErrNotAValidName
 	}
+	room := reg.GetRoom(auth.RoomID)
 	if room == nil {
-		conn.Close()
 		return ErrCanNotJoinTheRoom
 	}
 	client := &Client{
-		clientKey:       key,
-		name:            name,
+		clientKey:       auth.ClientKey,
+		name:            auth.Name,
 		room:            room,
 		conn:            conn,
 		send:            make(chan *kecpmsg.Message, 256),
@@ -94,16 +120,25 @@ func (room *Room) NewClient(name string, key string, conn WebscoketConn) error {
 	select {
 	case joined := <-client.joined:
 		if !joined {
-			client.conn.Close()
 			return ErrNameIsAlreadyInUse
 		}
 	case <-checker.C:
-		client.conn.Close()
+		sendErrorMsg(conn, ErrCanNotJoinTheRoom)
 		return ErrCanNotJoinTheRoom
 	}
+	client.sendListMsg()
 	go client.readPump()
 	go client.writePump()
 	return nil
+}
+
+func sendErrorMsg(conn WebscoketConn, err error) {
+	conn.WriteMessage(ws.TextMessage, kecpmsg.NewErrorMsg(err).Build())
+	conn.WriteMessage(ws.CloseMessage, []byte{})
+}
+
+func (c *Client) sendListMsg() {
+	c.conn.WriteMessage(ws.TextMessage, (<-c.send).Build())
 }
 
 // readPump pumps messages from the websocket connection to the room.
@@ -118,13 +153,12 @@ func (c *Client) readPump() {
 		c.room.unregister.Write(c)
 		c.conn.Close()
 	}()
-	c.conn.SetReadLimit(maxMessageSize)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
 		_, msg, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			if ws.IsUnexpectedCloseError(err, ws.CloseGoingAway, ws.CloseAbnormalClosure) {
 				logger.Printf("error: %v", err)
 			}
 			break
@@ -162,30 +196,25 @@ func (c *Client) writePump() {
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The room closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.conn.WriteMessage(ws.CloseMessage, []byte{})
 				return
 			}
-
-			w, err := c.conn.NextWriter(websocket.TextMessage)
+			err := c.conn.WriteMessage(ws.TextMessage, kecpMsg.Build())
 			if err != nil {
 				return
 			}
-			w.Write(kecpMsg.Build())
-
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write(newline)
 				kecpMsg := <-c.send
-				w.Write(kecpMsg.Build())
-			}
-
-			if err := w.Close(); err != nil {
-				return
+				err := c.conn.WriteMessage(ws.TextMessage, kecpMsg.Build())
+				if err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if err := c.conn.WriteMessage(ws.PingMessage, nil); err != nil {
 				return
 			}
 		case <-c.selfDestruction:

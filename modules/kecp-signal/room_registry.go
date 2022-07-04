@@ -15,7 +15,7 @@ type Registry struct {
 	roomQuery *kchan.Channel[*roomQuery]
 
 	// roomDeletionRequest
-	roomDeletionRequest chan string
+	roomDeletionRequest chan *roomDeletion
 }
 
 func NewRegistry() *Registry {
@@ -24,7 +24,7 @@ func NewRegistry() *Registry {
 		register:            kchan.New[*Room](),
 		unregister:          kchan.New[*Room](),
 		roomQuery:           kchan.New[*roomQuery](),
-		roomDeletionRequest: make(chan string),
+		roomDeletionRequest: make(chan *roomDeletion),
 	}
 	go reg.run()
 	return reg
@@ -54,8 +54,8 @@ func (reg *Registry) run() {
 				roomQuery.room <- nil
 			}
 			close(roomQuery.room)
-		case roomID := <-reg.roomDeletionRequest:
-			if room, ok := reg.rooms[roomID]; ok {
+		case roomDele := <-reg.roomDeletionRequest:
+			if room, ok := reg.rooms[roomDele.roomID]; ok && room.MgtKey == roomDele.mgtKey {
 				room.selfDestruction <- true
 			}
 		}
@@ -77,6 +77,11 @@ func (reg *Registry) GetRoom(roomID string) *Room {
 	return room
 }
 
-func (reg *Registry) DeleteRoom(roomID string) {
-	reg.roomDeletionRequest <- roomID
+type roomDeletion struct {
+	roomID string
+	mgtKey string
+}
+
+func (reg *Registry) DeleteRoom(roomID string, managementKey string) {
+	reg.roomDeletionRequest <- &roomDeletion{roomID: roomID, mgtKey: managementKey}
 }

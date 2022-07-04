@@ -14,17 +14,23 @@ import (
 var FakeError = errors.New("this is a fake error")
 
 type Conn struct {
-	open     bool
-	mx       sync.RWMutex
-	reliable bool
-	name     string
+	open      bool
+	auth      bool
+	mx        sync.RWMutex
+	reliable  bool
+	roomID    string
+	name      string
+	clientKey string
 }
 
-func NewConn(reliable bool, name string) *Conn {
+func NewConn(reliable bool, roomID string, name string, clientKey string) *Conn {
 	conn := &Conn{
-		open:     true,
-		reliable: reliable,
-		name:     name,
+		open:      true,
+		auth:      false,
+		reliable:  reliable,
+		roomID:    roomID,
+		name:      name,
+		clientKey: clientKey,
 	}
 	return conn
 }
@@ -78,9 +84,21 @@ func (conn *Conn) ReadMessage() (messageType int, p []byte, err error) {
 		}
 	}
 	conn.mx.RUnlock()
+	probability := MathRandGen()
+	if !conn.auth {
+		if !conn.reliable && probability < 2 {
+			return TextMessage, []byte{}, nil
+		}
+		b, _ := json.Marshal(kecpmsg.AuthMessage{
+			RoomID:    conn.roomID,
+			Name:      conn.name,
+			ClientKey: conn.clientKey,
+		})
+		conn.auth = true
+		return TextMessage, b, nil
+	}
 	t := time.NewTimer(MathRandShortTimeGen())
 	defer t.Stop()
-	probability := MathRandGen()
 	select {
 	case <-t.C:
 		if !conn.reliable && probability < 2 {
@@ -89,11 +107,26 @@ func (conn *Conn) ReadMessage() (messageType int, p []byte, err error) {
 				Text: "CloseAbnormalClosure",
 			}
 		} else {
-			d, _ := json.Marshal(kecpmsg.Message{
-				Type:    kecpmsg.Chat,
-				Name:    conn.name,
-				Payload: "hello",
-			})
+			var msg interface{}
+
+			if probability < 8 {
+				msg = kecpmsg.Message{
+					Type:    kecpmsg.Chat,
+					Name:    conn.name,
+					Payload: "hello",
+				}
+			} else if probability < 14 {
+				msg = kecpmsg.Message{
+					Type:    kecpmsg.Chat,
+					Name:    conn.name,
+					Target:  conn.name,
+					Payload: "hello",
+				}
+			} else {
+				msg = "error"
+			}
+
+			d, _ := json.Marshal(msg)
 			return TextMessage, d, nil
 		}
 	}

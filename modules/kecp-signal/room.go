@@ -6,6 +6,7 @@ import (
 	kchan "github.com/fourdim/kecp/modules/kecp-channel"
 	kecpcrypto "github.com/fourdim/kecp/modules/kecp-crypto"
 	kecpmsg "github.com/fourdim/kecp/modules/kecp-msg"
+	kecpvalidate "github.com/fourdim/kecp/modules/kecp-validate"
 )
 
 const (
@@ -16,7 +17,7 @@ type Room struct {
 	RoomID string
 
 	// Creator's key
-	ManagementKey string
+	MgtKey string
 
 	// Registry
 	registry *Registry
@@ -44,10 +45,13 @@ type Room struct {
 }
 
 func (reg *Registry) NewRoom(managementKey string) string {
+	if !kecpvalidate.IsAValidCryptoKey(managementKey) {
+		return ""
+	}
 	roomID := kecpcrypto.GenerateToken()
 	room := &Room{
 		RoomID:          roomID,
-		ManagementKey:   managementKey,
+		MgtKey:          managementKey,
 		registry:        reg,
 		broadcast:       kchan.New[*kecpmsg.Message](),
 		forward:         kchan.New[*kecpmsg.Message](),
@@ -90,6 +94,7 @@ func (room *Room) run() {
 			}
 			if previousClient, ok := room.clients[client.clientKey]; ok {
 				previousClient.selfDestruction <- true
+				broadcast(room, kecpmsg.NewLeaveMsg(previousClient.name, previousClient.clientKey))
 			}
 			room.clients[client.clientKey] = client
 			client.joined <- true
@@ -97,18 +102,24 @@ func (room *Room) run() {
 			for _, eachClient := range room.clients {
 				names = append(names, eachClient.name)
 			}
-			client.send <- kecpmsg.NewListMessage(names)
-			broadcast(room, kecpmsg.NewJoinMessage(client.name, client.clientKey))
+			client.send <- kecpmsg.NewListMsg(names)
+			broadcast(room, kecpmsg.NewJoinMsg(client.name, client.clientKey))
 		case clientUnregistered := <-room.unregister.Read():
+			var replace bool
 			if client, ok := room.clients[clientUnregistered.clientKey]; ok {
 				if client == clientUnregistered {
+					replace = false
 					delete(room.clients, clientUnregistered.clientKey)
+				} else {
+					replace = true
 				}
 			}
 			close(clientUnregistered.send)
 			close(clientUnregistered.joined)
 			close(clientUnregistered.selfDestruction)
-			broadcast(room, kecpmsg.NewLeaveMessage(clientUnregistered.name))
+			if !replace {
+				broadcast(room, kecpmsg.NewLeaveMsg(clientUnregistered.name, clientUnregistered.clientKey))
+			}
 			if len(room.clients) == 0 {
 				return
 			}

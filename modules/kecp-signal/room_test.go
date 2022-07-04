@@ -28,7 +28,7 @@ func TestNoUserJoined(t *testing.T) {
 	for range roomIDs {
 		rand.Read(b)
 		userKey := base64.RawURLEncoding.EncodeToString(b)
-		err := reg.GetRoom(userKey).NewClient("〔=ヘ=#〕", userKey, kecpfakews.NewConn(false, "〔=ヘ=#〕"))
+		err := reg.NewClient(kecpfakews.NewConn(false, userKey, "〔=ヘ=#〕", userKey))
 		assert.EqualError(t, err, ErrCanNotJoinTheRoom.Error())
 	}
 
@@ -37,4 +37,30 @@ func TestNoUserJoined(t *testing.T) {
 	select {
 	case <-timer1.C:
 	}
+
+	for _, roomID := range roomIDs {
+		rand.Read(b)
+		userKey := base64.RawURLEncoding.EncodeToString(b)
+		userName := userKey[:12]
+		assert.EqualError(t, reg.NewClient(kecpfakews.NewConn(true, roomID, userName, userKey)), ErrCanNotJoinTheRoom.Error())
+	}
+}
+
+func TestUserReplacement(t *testing.T) {
+	reg := NewRegistry()
+	b := make([]byte, 48)
+	rand.Read(b)
+	userKey := base64.RawURLEncoding.EncodeToString(b)
+	roomID := reg.NewRoom(userKey)
+	err := reg.NewClient(kecpfakews.NewConn(true, roomID, "〔=ヘ=#〕", userKey))
+	assert.NoError(t, err)
+
+	timer1 := time.NewTimer(1 * time.Millisecond)
+	defer timer1.Stop()
+	select {
+	case <-timer1.C:
+	}
+
+	err = reg.NewClient(kecpfakews.NewConn(true, roomID, "〔=ヘ=#〕", userKey))
+	assert.NoError(t, err)
 }
