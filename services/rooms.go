@@ -25,7 +25,7 @@ type CreateRoomResponse struct {
 }
 
 func (resp *CreateRoomResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	if len(resp.RoomID) != 64 {
+	if len(resp.RoomID) != 16 {
 		return errors.New("unable to create the room.")
 	}
 	return nil

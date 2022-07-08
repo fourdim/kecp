@@ -13,7 +13,7 @@ export type {
   KecpMessage,
 } from './src/types';
 
-export type {
+export {
   KecpMessageType,
   KecpEventType,
 } from './src/enums';

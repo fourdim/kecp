@@ -1,4 +1,4 @@
-import { KecpMessageType } from './enums';
+import type { KecpMessageType } from './enums';
 
 type RTCIceCredentialType = 'password';
 

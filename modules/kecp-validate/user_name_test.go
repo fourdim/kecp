@@ -40,9 +40,23 @@ func TestIsValidUserName(t *testing.T) {
 			true,
 		},
 		{
-			"Length Test",
+			"Length Test 1",
 			args{
 				s: "0123456789abcdefg",
+			},
+			false,
+		},
+		{
+			"Length Test 2",
+			args{
+				s: "",
+			},
+			false,
+		},
+		{
+			"Space Test",
+			args{
+				s: " ",
 			},
 			false,
 		},

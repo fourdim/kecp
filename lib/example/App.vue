@@ -166,8 +166,8 @@ function hangUpCall() { }
           id="room"
           v-model="roomID"
           type="text"
-          maxlength="64"
-          minlength="64"
+          maxlength="16"
+          minlength="16"
           inputmode="text"
         >
         <input

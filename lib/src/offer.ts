@@ -6,4 +6,8 @@ export default class OfferPeer extends Peer {
       (track) => this.peerConnection.addTrack(track, stream),
     );
   }
+
+  setBandwidth(bandWidth: number) {
+    this.bandWidth = bandWidth;
+  }
 }

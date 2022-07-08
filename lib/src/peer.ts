@@ -1,6 +1,6 @@
 import type KecpConnection from './connection';
 import { KecpEventType, KecpMessageType } from './enums';
-import { RTCIceServer } from './types';
+import type { RTCIceServer } from './types';
 
 export default class Peer {
   protected peerConnection: RTCPeerConnection;
@@ -8,6 +8,8 @@ export default class Peer {
   protected kecpConnection: KecpConnection;
 
   protected target: string;
+
+  protected bandWidth: number | undefined;
 
   constructor(
     kecpConnection: KecpConnection,
@@ -43,6 +45,15 @@ export default class Peer {
   private async handleVideoAnswerMsg(event: CustomEvent) {
     const desc = new RTCSessionDescription(event.detail.payload);
     await this.peerConnection.setRemoteDescription(desc);
+    if (desc.type === 'answer' && this.bandWidth !== undefined) {
+      const sender = this.peerConnection.getSenders()[0];
+      const parameters = sender.getParameters();
+      if (!parameters.encodings) {
+        parameters.encodings = [{}];
+      }
+      parameters.encodings[0].maxBitrate = this.bandWidth * 1000;
+      sender.setParameters(parameters).catch();
+    }
   }
 
   private handleICECandidateEvent(event: RTCPeerConnectionIceEvent) {
@@ -117,5 +128,9 @@ export default class Peer {
 
   getTargetName(): string {
     return this.target;
+  }
+
+  close() {
+    this.peerConnectionClose();
   }
 }

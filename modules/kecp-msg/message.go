@@ -3,7 +3,6 @@ package kecpmsg
 import (
 	"encoding/json"
 	"errors"
-	"log"
 )
 
 type MsgType string
@@ -92,6 +91,5 @@ func (kecpMsg *Message) NeedBroadcast() bool {
 
 func (kecpMsg *Message) Build() []byte {
 	b, _ := json.Marshal(kecpMsg)
-	log.Println(string(b))
 	return b
 }

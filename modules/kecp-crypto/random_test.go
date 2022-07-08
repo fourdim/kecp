@@ -7,7 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGenerateToken(t *testing.T) {
-	token := GenerateToken()
+func TestGenerateCryptoKey(t *testing.T) {
+	token := GenerateCryptoKey()
 	assert.Len(t, token, 64)
+}
+
+func TestGenerateRoomID(t *testing.T) {
+	token := GenerateRoomID()
+	assert.Len(t, token, 16)
 }

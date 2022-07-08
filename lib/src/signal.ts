@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import KecpConnection from './connection';
 import { genCryptoKey } from './helper';
-import {
+import type {
   CreateRoomResponse, ErrResponse, KecpConnectionOption, Room,
 } from './types';
 
@@ -27,7 +27,7 @@ export default class KecpSignal {
   newRoom(): Promise<Room> {
     return axios.post(this.roomsEndPoint, {
       client_key: this.clientKey,
-    }).then((res) => {
+    }, { timeout: 8000 }).then((res) => {
       const createRoomResponse = res.data as CreateRoomResponse;
       return {
         roomID: createRoomResponse.room_id,
@@ -36,9 +36,15 @@ export default class KecpSignal {
     }).catch((err: AxiosError) => {
       if (err.response) {
         const errResponse = err.response.data as ErrResponse;
+        if (errResponse) {
+          return {
+            roomID: '',
+            errorText: errResponse.error,
+          };
+        }
         return {
           roomID: '',
-          errorText: errResponse.error,
+          errorText: err.response.statusText,
         };
       }
       return {

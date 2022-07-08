@@ -48,7 +48,7 @@ func (reg *Registry) NewRoom(managementKey string) string {
 	if !kecpvalidate.IsAValidCryptoKey(managementKey) {
 		return ""
 	}
-	roomID := kecpcrypto.GenerateToken()
+	roomID := kecpcrypto.GenerateRoomID()
 	room := &Room{
 		RoomID:          roomID,
 		MgtKey:          managementKey,

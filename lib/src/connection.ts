@@ -1,7 +1,7 @@
 import AnswerPeer from './answer';
 import OfferPeer from './offer';
 import { KecpEventType, KecpMessageType } from './enums';
-import { KecpInternalConnectionOption, KecpMessage, RTCIceServer } from './types';
+import type { KecpInternalConnectionOption, KecpMessage, RTCIceServer } from './types';
 
 interface KecpConnectionCustomEventCallback {
   // eslint-disable-next-line no-unused-vars

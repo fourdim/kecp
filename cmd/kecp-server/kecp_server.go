@@ -1,24 +1,44 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"path"
 	"strings"
+	"time"
 
+	"github.com/caddyserver/certmagic"
 	"github.com/fourdim/kecp/router"
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
 
+var App struct {
+	Server struct {
+		Debug          bool
+		TLS            bool
+		Host           string
+		AllowedOrigins []string `toml:"allowed_origins"`
+	}
+}
+
 func main() {
+	b, err := os.ReadFile("config.toml")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	toml.Unmarshal(b, &App)
+
 	kecpApiServerRouter := chi.NewRouter()
 
 	kecpApiServerRouter.Route("/api", func(r chi.Router) {
 		r.Use(cors.Handler(cors.Options{
 			// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
-			AllowedOrigins: []string{"https://*", "http://*"},
+			AllowedOrigins: App.Server.AllowedOrigins,
 			// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowedHeaders:   []string{"Accept", "Content-Type", "Upgrade", "Connection", "Sec-WebSocket-Key", "Sec-WebSocket-Protocol", "Sec-WebSocket-Version", "Sec-WebSocket-Extensions"},
@@ -29,9 +49,14 @@ func main() {
 		r.Mount("/kecp", router.SetupKecpChiRouter())
 	})
 
-	kecpApiServerRouter.NotFound(ServeRoot("/", "./tmp"))
+	kecpApiServerRouter.NotFound(ServeRoot("/", "./app/dist"))
 
-	http.ListenAndServe(":8090", kecpApiServerRouter)
+	if App.Server.Debug || !App.Server.TLS {
+		http.ListenAndServe(":8090", kecpApiServerRouter)
+	} else {
+		certmagic.HTTPS([]string{App.Server.Host}, kecpApiServerRouter)
+	}
+
 }
 
 const INDEX = "index.html"
@@ -65,8 +90,8 @@ func (l *localFileSystem) Exists(prefix string, filepath string) bool {
 		if stats.IsDir() {
 			if !l.indexes {
 				index := path.Join(name, INDEX)
-				stats, err := os.Stat(index)
-				if err != nil && !stats.IsDir() {
+				_, err := os.Stat(index)
+				if err != nil {
 					return false
 				}
 			}
@@ -77,11 +102,11 @@ func (l *localFileSystem) Exists(prefix string, filepath string) bool {
 }
 
 func ServeRoot(urlPrefix, root string) http.HandlerFunc {
-	return Serve(urlPrefix, LocalFile(root, false))
+	return Serve(urlPrefix, root, LocalFile(root, false))
 }
 
 // Static returns a middleware handler that serves static files in the given directory.
-func Serve(urlPrefix string, fs ServeFileSystem) http.HandlerFunc {
+func Serve(urlPrefix string, root string, fs ServeFileSystem) http.HandlerFunc {
 	fileserver := http.FileServer(fs)
 	if urlPrefix != "" {
 		fileserver = http.StripPrefix(urlPrefix, fileserver)
@@ -89,6 +114,12 @@ func Serve(urlPrefix string, fs ServeFileSystem) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if fs.Exists(urlPrefix, r.URL.Path) {
 			fileserver.ServeHTTP(w, r)
+		} else {
+			f, err := os.Open(path.Join(root, INDEX))
+			if err != nil {
+				return
+			}
+			http.ServeContent(w, r, INDEX, time.Now(), f)
 		}
 	}
 }
