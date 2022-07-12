@@ -1,8 +1,8 @@
 import axios, { AxiosError } from 'axios';
-import KecpConnection from './connection';
+import KecpRoom from './room';
 import { genCryptoKey } from './helper';
 import type {
-  CreateRoomResponse, ErrResponse, KecpConnectionOption, Room,
+  CreateRoomResponse, ErrResponse, KecpRoomOption,
 } from './types';
 
 export default class KecpSignal {
@@ -24,41 +24,28 @@ export default class KecpSignal {
     this.clientsEndPoint = wsEndPoint.toString();
   }
 
-  newRoom(): Promise<Room> {
+  createRoom(): Promise<string> {
     return axios.post(this.roomsEndPoint, {
       client_key: this.clientKey,
     }, { timeout: 8000 }).then((res) => {
       const createRoomResponse = res.data as CreateRoomResponse;
-      return {
-        roomID: createRoomResponse.room_id,
-        errorText: '',
-      };
+      return createRoomResponse.room_id;
     }).catch((err: AxiosError) => {
       if (err.response) {
         const errResponse = err.response.data as ErrResponse;
         if (errResponse) {
-          return {
-            roomID: '',
-            errorText: errResponse.error,
-          };
+          throw errResponse.error;
         }
-        return {
-          roomID: '',
-          errorText: err.response.statusText,
-        };
+        throw err.response.statusText;
       }
-      return {
-        roomID: '',
-        errorText: err.message,
-      };
+      throw err.message;
     });
   }
 
-  newConnection(option: KecpConnectionOption): KecpConnection {
-    return new KecpConnection({
+  getRoom(option: KecpRoomOption): KecpRoom {
+    return new KecpRoom({
       websocketURL: this.clientsEndPoint,
       roomID: option.roomID,
-      name: option.name,
       clientKey: this.clientKey,
       iceServers: option.iceServers ? option.iceServers : [{
         urls: 'stun:stun.stunprotocol.org',

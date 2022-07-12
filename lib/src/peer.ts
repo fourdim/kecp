@@ -1,33 +1,33 @@
-import type KecpConnection from './connection';
+import type KecpRoom from './room';
 import { KecpEventType, KecpMessageType } from './enums';
 import type { RTCIceServer } from './types';
 
 export default class Peer {
   protected peerConnection: RTCPeerConnection;
 
-  protected kecpConnection: KecpConnection;
+  protected kecpRoom: KecpRoom;
 
   protected target: string;
 
   protected bandWidth: number | undefined;
 
   constructor(
-    kecpConnection: KecpConnection,
+    room: KecpRoom,
     iceServers: RTCIceServer[],
     target: string,
   ) {
-    this.kecpConnection = kecpConnection;
+    this.kecpRoom = room;
     this.peerConnection = new RTCPeerConnection({ iceServers });
     this.target = target;
     this.peerConnection.onicecandidate = (event) => this.handleICECandidateEvent(event);
     this.peerConnection.onconnectionstatechange = () => this.handleICEConnectionStateChangeEvent();
     this.peerConnection.onsignalingstatechange = () => this.handleSignalingStateChangeEvent();
     this.peerConnection.onnegotiationneeded = () => this.handleNegotiationNeededEvent();
-    this.kecpConnection.on(
+    this.kecpRoom.on(
       KecpEventType.NewIceCandidate,
       (event) => this.handleNewICECandidateMsg(event),
     );
-    this.kecpConnection.on(
+    this.kecpRoom.on(
       KecpEventType.VideoAnswer,
       (event) => this.handleVideoAnswerMsg(event),
     );
@@ -60,7 +60,7 @@ export default class Peer {
     if (event.candidate) {
       this.send(JSON.stringify({
         type: KecpMessageType.NewIceCandidate,
-        name: this.kecpConnection.getName(),
+        name: this.kecpRoom.getSelfName(),
         target: this.target,
         payload: event.candidate,
       }));
@@ -97,7 +97,7 @@ export default class Peer {
     await this.peerConnection.setLocalDescription(offer);
 
     this.send(JSON.stringify({
-      name: this.kecpConnection.getName(),
+      name: this.kecpRoom.getSelfName(),
       target: this.target,
       type: 'video-offer',
       payload: this.peerConnection.localDescription,
@@ -105,7 +105,7 @@ export default class Peer {
   }
 
   protected send(msg: string) {
-    this.kecpConnection.send(msg);
+    this.kecpRoom.send(msg);
   }
 
   protected async peerConnectionClose() {

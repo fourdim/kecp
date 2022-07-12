@@ -87,7 +87,7 @@ function handleSendButton() {
   }
   conn.value?.send(JSON.stringify({
     type: KecpMessageType.Chat,
-    name: conn.value.getName(),
+    name: conn.value.getSelfName(),
     payload: sendValue.value,
   }));
 }
@@ -106,7 +106,7 @@ function setChatRef(el) {
 }
 
 async function dial(user: string) {
-  if (user === conn.value?.getName()) {
+  if (user === conn.value?.getSelfName()) {
     return;
   }
 

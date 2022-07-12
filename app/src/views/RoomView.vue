@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import videojs, { type VideoJsPlayer } from "video.js";
-import { useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   KecpSignal,
-  KecpConnection,
+  KecpRoom,
   AnswerPeer,
   KecpEventType,
   KecpMessageType,
@@ -18,18 +18,23 @@ import {
   type UploadFiles,
 } from "element-plus";
 import { kecpEndpoint } from "@/config";
+import Background from "@/components/BackgroundComponent.vue";
+import Header from "@/components/HeaderComponent.vue";
+import IconLink from "@/components/icons/IconLink.vue";
 
 type KecpChat = KecpMessage & { chatID: number };
 interface HTMLMediaElementWithCaputreStream extends HTMLMediaElement {
   captureStream(): MediaStream;
 }
 
+const route = useRoute();
+const router = useRouter();
 const videoPlayerEl = ref<HTMLMediaElementWithCaputreStream>();
 const player = ref<VideoJsPlayer>();
 const roomID = ref("");
+const room = ref<KecpRoom>();
 const username = ref("");
 const usernameInput = ref("");
-const conn = ref<KecpConnection>();
 const userList = ref<string[]>([]);
 const targetUser = ref<string>("");
 const chatList = ref<KecpChat[]>([]);
@@ -39,36 +44,40 @@ const sendValue = ref("");
 const chatIDCouter = ref(0);
 const chatBox = ref<HTMLElement[]>([]);
 const fileURL = ref("");
-const route = useRoute();
-const router = useRouter();
 const scrollBar = ref<InstanceType<typeof ElScrollbar>>();
 const innerRef = ref<HTMLDivElement>();
+const settingsDialogVisible = ref(false);
+const initDialogVisible = ref(false);
+const initDialogLoading = ref(false);
 
 function connect() {
-  conn.value = sig.newConnection({
-    roomID: roomID.value,
-    name: username.value,
-  });
+  if (room.value === undefined) {
+    return;
+  }
 
-  conn.value.on(KecpEventType.Open, () => {
+  room.value.connect(username.value);
+
+  room.value.on(KecpEventType.Open, () => {
     connected.value = true;
   });
 
-  conn.value.on(KecpEventType.UserListInit, (evt: CustomEvent<string[]>) => {
+  room.value.on(KecpEventType.UserListInit, (evt: CustomEvent<string[]>) => {
     userList.value = evt.detail.slice();
+    initDialogLoading.value = false;
+    initDialogVisible.value = false;
   });
 
-  conn.value.on(KecpEventType.UserJoin, (evt: CustomEvent<string>) => {
+  room.value.on(KecpEventType.UserJoin, (evt: CustomEvent<string>) => {
     userList.value.push(evt.detail);
   });
 
-  conn.value.on(KecpEventType.UserLeave, (evt: CustomEvent<string>) => {
+  room.value.on(KecpEventType.UserLeave, (evt: CustomEvent<string>) => {
     if (userList.value.indexOf(evt.detail) !== -1) {
       userList.value.splice(userList.value.indexOf(evt.detail));
     }
   });
 
-  conn.value.on(KecpEventType.Chat, (evt: CustomEvent<KecpMessage>) => {
+  room.value.on(KecpEventType.Chat, (evt: CustomEvent<KecpMessage>) => {
     chatIDCouter.value += 1;
     chatList.value.push({
       chatID: chatIDCouter.value,
@@ -82,7 +91,7 @@ function connect() {
     }, 150);
   });
 
-  conn.value.on(
+  room.value.on(
     KecpEventType.VideoOffer,
     async (evt: CustomEvent<AnswerPeer>) => {
       const stream = new MediaStream();
@@ -126,7 +135,7 @@ function connect() {
     }
   );
 
-  conn.value.on(KecpEventType.VideoAnswer, (evt: CustomEvent<KecpMessage>) => {
+  room.value.on(KecpEventType.VideoAnswer, (evt: CustomEvent<KecpMessage>) => {
     if (evt.detail.payload.type === "answer") {
       ElMessage({
         type: "success",
@@ -135,7 +144,7 @@ function connect() {
     }
   });
 
-  conn.value.on(KecpEventType.Error, (evt: CustomEvent<KecpMessage>) => {
+  room.value.on(KecpEventType.Error, (evt: CustomEvent<KecpMessage>) => {
     if (evt.detail.payload === "cannot join the room") {
       router.replace("/create");
     }
@@ -147,6 +156,7 @@ function connect() {
         });
         username.value = "";
         connected.value = false;
+        initDialogLoading.value = false;
         break;
       case "not a valid name":
         ElMessage({
@@ -155,6 +165,7 @@ function connect() {
         });
         username.value = "";
         connected.value = false;
+        initDialogLoading.value = false;
         break;
     }
   });
@@ -162,6 +173,9 @@ function connect() {
 
 onMounted(() => {
   roomID.value = route.params["roomID"] as string;
+  room.value = sig.getRoom({
+    roomID: roomID.value,
+  });
   username.value = (route.params["username"] ?? "") as string;
   if (roomID.value.length !== 16) {
     router.replace("/create");
@@ -174,6 +188,8 @@ onMounted(() => {
   }
   if (!connected.value && username.value !== "") {
     connect();
+  } else if (username.value === "") {
+    initDialogVisible.value = true;
   }
 });
 
@@ -194,14 +210,32 @@ function uploadFile(uploadFile: UploadFile, uploadFiles: UploadFiles) {
   }
 }
 
+function removeFile() {
+  if (videoPlayerEl.value !== null && videoPlayerEl.value !== undefined) {
+    videoPlayerEl.value.srcObject = null;
+    player.value?.reset();
+  }
+  if (fileURL.value !== "") {
+    URL.revokeObjectURL(fileURL.value);
+  }
+  fileURL.value = "";
+}
+
+function exceedFile() {
+  ElMessage({
+    type: "warning",
+    message: "Limit to 1 file, please remove the existing one",
+  });
+}
+
 function handleSendButton() {
   if (sendValue.value === "") {
     return;
   }
-  conn.value?.send(
+  room.value?.send(
     JSON.stringify({
       type: KecpMessageType.Chat,
-      name: conn.value.getName(),
+      name: room.value.getSelfName(),
       payload: sendValue.value,
     })
   );
@@ -209,17 +243,18 @@ function handleSendButton() {
 
 function handleJoinButton() {
   username.value = usernameInput.value;
+  initDialogLoading.value = true;
   connect();
 }
 
 function handleDialButton() {
-  if (targetUser.value === conn.value?.getName()) {
+  if (targetUser.value === room.value?.getSelfName()) {
     return;
   }
 
   const stream = videoPlayerEl.value?.captureStream();
   if (stream) {
-    const offer = conn.value?.newOffer(targetUser.value);
+    const offer = room.value?.newOffer(targetUser.value);
     offer?.addStream(stream);
     offer?.setBandwidth(10000);
   }
@@ -251,6 +286,8 @@ function playerPause() {
 </script>
 
 <template>
+  <Background></Background>
+  <Header @open-settings="settingsDialogVisible = true"></Header>
   <div
     class="room-grid-container"
     @keydown.arrow-left="playerRewind"
@@ -258,13 +295,16 @@ function playerPause() {
     @keydown.space="playerPause"
   >
     <div class="left flex flex-col">
-      <div class="video-container">
+      <div class="video-container bg-white">
         <video
           ref="videoPlayerEl"
           class="video-js vjs-big-play-centered vjs-show-big-play-button-on-pause"
         ></video>
       </div>
-      <div class="chat-input-container" @keyup.enter="handleSendButton()">
+      <div
+        class="chat-input-container bg-white"
+        @keyup.enter="handleSendButton()"
+      >
         <span>Chat:</span>
         <el-input class="chat-input px-2" v-model="sendValue" />
         <el-button id="send" :disabled="!connected" @click="handleSendButton()">
@@ -273,41 +313,7 @@ function playerPause() {
       </div>
     </div>
     <div class="right">
-      <div class="ctrl-container flex-shrink-0">
-        <div class="flex justify-center" v-if="username !== ''">
-          <el-select v-model="targetUser" placeholder="Select">
-            <el-option
-              v-for="item in userList"
-              :key="item"
-              :label="item"
-              :value="item"
-            />
-          </el-select>
-          <el-button
-            id="send"
-            :disabled="!connected || targetUser === '' || fileURL == ''"
-            @click="handleDialButton()"
-          >
-            Dial
-          </el-button>
-        </div>
-        <div class="flex justify-center" v-else>
-          <el-input class="chat-input" v-model="usernameInput" />
-          <el-button
-            id="join"
-            :disabled="connected"
-            @click="handleJoinButton()"
-          >
-            Join
-          </el-button>
-        </div>
-        <div class="mt-2">
-          <el-upload multiple :auto-upload="false" :on-change="uploadFile">
-            <el-button type="primary">Click to upload video files</el-button>
-          </el-upload>
-        </div>
-      </div>
-      <el-scrollbar class="chat-container mt-5" ref="scrollBar">
+      <el-scrollbar class="chat-container bg-white" ref="scrollBar">
         <div ref="innerRef">
           <span
             class="leading-snug"
@@ -321,6 +327,82 @@ function playerPause() {
       </el-scrollbar>
     </div>
   </div>
+  <el-dialog v-model="settingsDialogVisible" custom-class="setting-dialog">
+    <div class="card-title">
+      <span class="title">Settings</span>
+    </div>
+    <div class="ctrl-container flex-shrink-0 px-12 py-8">
+      <span class="text-lg mb-2">Choose a video file:</span>
+      <div class="mb-2">
+        <el-upload
+          drag
+          :auto-upload="false"
+          :on-change="uploadFile"
+          :on-remove="removeFile"
+          :on-exceed="exceedFile"
+          :limit="1"
+        >
+          <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+          <div class="el-upload__text">
+            Drop file here or <em>click to upload</em>
+          </div>
+        </el-upload>
+      </div>
+      <span class="text-lg mb-2">Select a target to dial:</span>
+      <div class="flex">
+        <el-select v-model="targetUser" placeholder="Select">
+          <el-option
+            v-for="item in userList"
+            :key="item"
+            :label="item"
+            :value="item"
+          />
+        </el-select>
+        <el-button
+          id="send"
+          class="mx-3"
+          :disabled="!connected || targetUser === '' || fileURL == ''"
+          @click="handleDialButton()"
+        >
+          Dial
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
+  <el-dialog
+    :show-close="false"
+    :close-on-press-escape="false"
+    v-model="initDialogVisible"
+    custom-class="init-dialog"
+    top="30vh"
+  >
+    <div class="card-title">
+      <span class="title">Join the Room</span>
+    </div>
+    <div class="card-content">
+      <el-row class="my-3">
+        <el-col :xs="24" :span="6">
+          <span class="h-full py-1 text-gray-600 inline-flex items-center">
+            Username:
+          </span>
+        </el-col>
+        <el-col :xs="24" :span="18">
+          <el-input v-model="usernameInput" />
+        </el-col>
+      </el-row>
+      <el-row class="my-2">
+        <span class="text-xs">
+          Need a new room?
+          <RouterLink to="/create"> <IconLink />Create one! </RouterLink>
+        </span>
+      </el-row>
+      <el-row class="mt-8 mb-3">
+        <el-button type="primary" class="mx-auto" @click="handleJoinButton">
+          <span class="px-5 text-base">Join</span>
+        </el-button>
+      </el-row>
+    </div>
+  </el-dialog>
 </template>
 
 <style>
@@ -345,6 +427,7 @@ function playerPause() {
       "left"
       "right";
     grid-template-columns: auto;
+    grid-template-rows: auto 40vh;
   }
 }
 
@@ -375,16 +458,7 @@ function playerPause() {
   grid-area: ctrl-container;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  border-radius: var(--el-border-radius-base);
-  box-shadow: var(--el-box-shadow-light);
-  min-height: 0;
-}
-
-@media (max-width: 1024px) {
-  .ctrl-container {
-    margin-top: 30px;
-  }
+  background-color: #ecf5ff;
 }
 
 .right {
@@ -393,10 +467,71 @@ function playerPause() {
   flex-direction: column;
 }
 
+@media (max-width: 1024px) {
+  .right {
+    margin-top: 30px;
+  }
+}
+
 .chat-container {
   padding: 16px;
   border-radius: var(--el-border-radius-base);
   box-shadow: var(--el-box-shadow-light);
-  max-height: 65vh;
+  max-height: 70vh;
+}
+
+.card-title {
+  display: flex;
+  justify-content: center;
+  padding: 25px;
+  padding-top: 10px;
+}
+
+.title {
+  font-size: x-large;
+  font-weight: 600;
+}
+
+.card-content {
+  background-color: #ecf5ff;
+  padding: 30px 50px;
+}
+
+a {
+  color: #0067b8;
+}
+</style>
+
+<style>
+.el-dialog__body {
+  padding: 0px;
+}
+
+@media (max-width: 1024px) {
+  .setting-dialog {
+    --el-dialog-width: 70%;
+  }
+}
+
+.init-dialog {
+  --el-dialog-width: 30%;
+}
+
+@media (max-width: 1536px) {
+  .init-dialog {
+    --el-dialog-width: 40%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .init-dialog {
+    --el-dialog-width: 60%;
+  }
+}
+
+@media (max-width: 768px) {
+  .init-dialog {
+    --el-dialog-width: 70%;
+  }
 }
 </style>

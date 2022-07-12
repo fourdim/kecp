@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import logo from "@/assets/logo.svg";
+defineProps({
+  banner: {
+    type: Boolean,
+    default: false,
+  },
+});
 </script>
 
 <template>
   <div class="background-container">
     <div class="background-transformed"></div>
   </div>
-  <div class="banner">
+  <div v-if="banner" class="banner">
     <img :src="logo" width="60" />
     <span class="banner-text text-4xl font-bold mx-5">Kecp</span>
   </div>

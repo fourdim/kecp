@@ -1,4 +1,4 @@
-import type KecpConnection from './connection';
+import type KecpRoom from './room';
 import { KecpMessageType } from './enums';
 import Peer from './peer';
 import type { KecpMessage, RTCIceServer } from './types';
@@ -6,8 +6,8 @@ import type { KecpMessage, RTCIceServer } from './types';
 export default class AnswerPeer extends Peer {
   private sdp: any;
 
-  constructor(offer: KecpMessage, kecpConnection: KecpConnection, iceServers: RTCIceServer[]) {
-    super(kecpConnection, iceServers, offer.name!);
+  constructor(offer: KecpMessage, room: KecpRoom, iceServers: RTCIceServer[]) {
+    super(room, iceServers, offer.name!);
     this.sdp = offer.payload;
   }
 
@@ -26,7 +26,7 @@ export default class AnswerPeer extends Peer {
     await this.peerConnection.setLocalDescription(await this.peerConnection.createAnswer());
     this.send(JSON.stringify({
       type: KecpMessageType.VideoAnswer,
-      name: this.kecpConnection.getName(),
+      name: this.kecpRoom.getSelfName(),
       target: this.target,
       payload: this.peerConnection.localDescription,
     }));
@@ -41,7 +41,7 @@ export default class AnswerPeer extends Peer {
     await this.peerConnection.setLocalDescription(preAnswerDesc);
     this.send(JSON.stringify({
       type: KecpMessageType.VideoAnswer,
-      name: this.kecpConnection.getName(),
+      name: this.kecpRoom.getSelfName(),
       target: this.target,
       payload: preAnswerDesc,
     }));
@@ -54,7 +54,7 @@ export default class AnswerPeer extends Peer {
     await this.peerConnection.setLocalDescription(answerDesc);
     this.send(JSON.stringify({
       type: KecpMessageType.VideoAnswer,
-      name: this.kecpConnection.getName(),
+      name: this.kecpRoom.getSelfName(),
       target: this.target,
       payload: answerDesc,
     }));

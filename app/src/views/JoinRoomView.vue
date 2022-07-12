@@ -37,7 +37,7 @@ function join() {
 </script>
 
 <template>
-  <Background></Background>
+  <Background banner></Background>
   <div class="card-container">
     <transition name="el-fade-in-linear">
       <el-card v-show="show" :body-style="{ padding: '0px' }" class="card">

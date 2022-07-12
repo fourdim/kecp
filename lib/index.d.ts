@@ -1,15 +1,13 @@
 import KecpSignal from './src/signal';
-import KecpConnection from './src/connection';
+import KecpRoom from './src/room';
 import AnswerPeer from './src/answer';
 import OfferPeer from './src/offer';
 
 export type {
   RTCIceServer,
-  Room,
   CreateRoomResponse,
   ErrResponse,
-  KecpConnectionOption,
-  KecpInternalConnectionOption,
+  KecpRoomOption,
   KecpMessage,
 } from './src/types';
 
@@ -20,7 +18,7 @@ export {
 
 export {
   KecpSignal,
-  KecpConnection,
+  KecpRoom,
   AnswerPeer,
   OfferPeer,
 };

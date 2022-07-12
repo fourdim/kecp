@@ -9,11 +9,6 @@ interface RTCIceServer {
     username?: string;
 }
 
-type Room = {
-    roomID: string
-    errorText: string
-}
-
 type CreateRoomResponse = {
     room_id: string
 }
@@ -24,16 +19,14 @@ type ErrResponse = {
     error: string
 }
 
-type KecpConnectionOption = {
+type KecpRoomOption = {
     roomID: string
-    name: string
     iceServers?: RTCIceServer[]
 }
 
-type KecpInternalConnectionOption = {
+type KecpRoomInternalOption = {
     websocketURL: string
     roomID: string
-    name: string
     clientKey: string
     iceServers: RTCIceServer[]
 }
@@ -47,10 +40,9 @@ type KecpMessage = {
 
 export type {
   RTCIceServer,
-  Room,
   CreateRoomResponse,
   ErrResponse,
-  KecpConnectionOption,
-  KecpInternalConnectionOption,
+  KecpRoomOption,
+  KecpRoomInternalOption,
   KecpMessage,
 };

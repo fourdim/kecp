@@ -9,7 +9,6 @@ import { kecpEndpoint } from "@/config";
 
 const show = ref(false);
 const username = ref("");
-const roomID = ref("");
 const sig = new KecpSignal(kecpEndpoint);
 const router = useRouter();
 
@@ -26,25 +25,25 @@ async function create() {
       message: "Invalid username",
     });
   }
-  const room = await sig.newRoom();
-  if (room.errorText) {
-    ElMessage({
-      type: "error",
-      message: room.errorText,
+  sig
+    .createRoom()
+    .then((roomID) => {
+      router.push({
+        name: "Room",
+        params: { roomID: roomID, username: username.value },
+      });
+    })
+    .catch((error) => {
+      ElMessage({
+        type: "error",
+        message: error,
+      });
     });
-    return;
-  }
-  roomID.value = room.roomID;
-
-  router.push({
-    name: "Room",
-    params: { roomID: roomID.value, username: username.value },
-  });
 }
 </script>
 
 <template>
-  <Background></Background>
+  <Background banner></Background>
   <div class="card-container">
     <transition name="el-fade-in-linear">
       <el-card v-show="show" :body-style="{ padding: '0px' }" class="card">
