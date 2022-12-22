@@ -1,6 +1,6 @@
 import type KecpRoom from './room';
 import { KecpMessageType } from './enums';
-import Peer from './peer';
+import Peer from './video-peer';
 import type { KecpMessage, RTCIceServer } from './types';
 
 export default class AnswerPeer extends Peer {

@@ -99,7 +99,7 @@ export default class Peer {
     this.send(JSON.stringify({
       name: this.kecpRoom.getSelfName(),
       target: this.target,
-      type: 'video-offer',
+      type: KecpMessageType.VideoOffer,
       payload: this.peerConnection.localDescription,
     }));
   }

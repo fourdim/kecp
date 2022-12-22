@@ -254,7 +254,7 @@ function handleDialButton() {
 
   const stream = videoPlayerEl.value?.captureStream();
   if (stream) {
-    const offer = room.value?.newOffer(targetUser.value);
+    const offer = room.value?.newVideoOffer(targetUser.value);
     offer?.addStream(stream);
     offer?.setBandwidth(10000);
   }

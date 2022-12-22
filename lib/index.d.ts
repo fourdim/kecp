@@ -1,7 +1,7 @@
 import KecpSignal from './src/signal';
 import KecpRoom from './src/room';
-import AnswerPeer from './src/answer';
-import OfferPeer from './src/offer';
+import AnswerPeer from './src/video-answer';
+import VideoOfferPeer from './src/video-offer';
 
 export type {
   RTCIceServer,
@@ -20,5 +20,5 @@ export {
   KecpSignal,
   KecpRoom,
   AnswerPeer,
-  OfferPeer,
+  VideoOfferPeer,
 };

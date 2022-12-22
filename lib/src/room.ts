@@ -1,5 +1,5 @@
-import AnswerPeer from './answer';
-import OfferPeer from './offer';
+import AnswerPeer from './video-answer';
+import VideoOfferPeer from './video-offer';
 import { KecpEventType, KecpMessageType } from './enums';
 import type { KecpRoomInternalOption, KecpMessage, RTCIceServer } from './types';
 
@@ -112,9 +112,16 @@ export default class KecpRoom {
     this.ws.onmessage = (event) => this.onMessageHandler(event);
   }
 
-  newOffer(target: string): OfferPeer | undefined {
+  newVideoOffer(target: string): VideoOfferPeer | undefined {
     if (this.userList.includes(target)) {
-      return new OfferPeer(this, this.iceServers, target);
+      return new VideoOfferPeer(this, this.iceServers, target);
+    }
+    return undefined;
+  }
+
+  newDataOffer(target: string): VideoOfferPeer | undefined {
+    if (this.userList.includes(target)) {
+      return new VideoOfferPeer(this, this.iceServers, target);
     }
     return undefined;
   }
