@@ -1,17 +1,25 @@
-# Kecp: Webrtc Video Streaming Tool
+# Kecp: Watch Video Together
 
 ## Introduction
 
 Kecp is a webrtc video streaming tool for allowing peers to watch the same video simultaneously. Moreover, a small chatroom is also supported! For now, Kecp is still under construction. API may experience breaking changes.
 
-## Get started
+## Features
 
-If you are not a developer who intends to use this tool as a library, this tool is generally available for you to use.
+- Webrtc: Peer-to-peer connection between two user agents, the data never passes through the web or application server.
+- Privacy: The signaling server is open source, you can deploy it on your own server to prevent MITM attacks.
+- Secure: It allows you to negotiate a session and then exchange data securely between two peers.
+- Cost-effective: No massive data costs on the server. The server is high performance and even a 1vCPU can handle it (but not recommended).
+- Local file supported: If you wish to watch videos together on online video platforms, please wait for the extension.
 
 ### Screenshots
 
 ![](assets/AB2D8BF.png)
 ![](assets/CF93C70.png)
+
+## Get started
+
+If you are not a developer who intends to use this tool as a library, this tool is generally available for you to use.
 
 ### Config
 
