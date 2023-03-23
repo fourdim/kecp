@@ -4,6 +4,8 @@ GO := go
 build:
 	CGO_ENABLED=0 $(GO) build -o ./build/kecp-server ./cmd/kecp-server
 	mkdir -p ./build/app/dist
+	pnpm -C ./lib install
+	pnpm -C ./lib build
 	pnpm -C ./app install
 	pnpm -C ./app build
 	cp -r ./app/dist/* ./build/app/dist/
